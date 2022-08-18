@@ -192,9 +192,8 @@ TrialAction.prototype.currentFloor = function() {
 TrialAction.prototype.loopCost = function(segment) {
     return precision3(Math.pow(this.baseScaling, Math.floor((towns[this.townNum][`${this.varName}LoopCounter`] + segment) / this.segments + 0.0000001)) * this.exponentScaling * getSkillBonus("Assassin"));
 }
-TrialAction.prototype.tickProgress = function(offset) {
-    return this.baseProgress() *
-        (1 + getLevel(this.loopStats[(towns[this.townNum][`${this.varName}LoopCounter`] + offset) % this.loopStats.length]) / 100) *
+TrialAction.prototype.tickProgress = function(_, adjustedTicks) {
+    return this.baseProgress() * this.manaCost() / adjustedTicks *
         Math.sqrt(1 + trials[this.trialNum][this.currentFloor()].completed / 200);
 }
 TrialAction.prototype.loopsFinished = function() {
@@ -221,8 +220,8 @@ AssassinAction.prototype.canStart = function() {return towns[this.townNum][`${th
 AssassinAction.prototype.loopCost = function(segment) {return 50000000;}
 AssassinAction.prototype.tickProgress = function(offset) {
     let baseSkill = Math.sqrt(getSkillLevel("Practical")) + getSkillLevel("Thievery") + getSkillLevel("Assassin");
-    let loopStat = (1 + getLevel(this.loopStats[(towns[this.townNum][`${this.varName}LoopCounter`] + offset) % this.loopStats.length]) / 1000);
-    let completions = Math.sqrt(1 + towns[this.townNum]["total"+this.varName] / 100);
+    let loopStat = this.manaCost() / adjustedTicks / 10;
+    let completions = Math.sqrt(1 + towns[this.townNum]["total" + this.varName] / 100);
     let reputationPenalty = resources.reputation != 0 ? Math.abs(resources.reputation) : 1;
     let killStreak = resources.heart > 0 ? resources.heart : 1;
     return baseSkill * loopStat * completions / reputationPenalty / killStreak;
@@ -363,7 +362,7 @@ function HaulAction(townNum) {
             return 50000;
         },
         visible() {
-            return towns[this.townNum].getLevel("RuinsZ" + townNum ) > 0;
+            return towns[this.townNum].getLevel("RuinsZ" + townNum) > 0;
         },
         unlocked() {
             return towns[this.townNum].getLevel("RuinsZ" + townNum) > 0;
@@ -1115,8 +1114,8 @@ Action.HealTheSick = new MultipartAction("Heal The Sick", {
     loopCost(segment) {
         return fibonacci(2 + Math.floor((towns[0].HealLoopCounter + segment) / this.segments + 0.0000001)) * 5000;
     },
-    tickProgress(offset) {
-        return getSkillLevel("Magic") * Math.max(getSkillLevel("Restoration") / 50, 1) * (1 + getLevel(this.loopStats[(towns[0].HealLoopCounter + offset) % this.loopStats.length]) / 100) * Math.sqrt(1 + towns[0].totalHeal / 100);
+    tickProgress(_, adjustedTicks) {
+        return getSkillLevel("Magic") * Math.max(getSkillLevel("Restoration") / 50, 1) * this.manaCost() / adjustedTicks * Math.sqrt(1 + towns[0].totalHeal / 100);
     },
     loopsFinished() {
         addResource("reputation", 3);
@@ -1181,8 +1180,8 @@ Action.FightMonsters = new MultipartAction("Fight Monsters", {
     loopCost(segment) {
         return fibonacci(Math.floor((towns[0].FightLoopCounter + segment) - towns[0].FightLoopCounter / 3 + 0.0000001)) * 10000;
     },
-    tickProgress(offset) {
-        return getSelfCombat() * (1 + getLevel(this.loopStats[(towns[0].FightLoopCounter + offset) % this.loopStats.length]) / 100) * Math.sqrt(1 + towns[0].totalFight / 100);
+    tickProgress(_, adjustedTicks) {
+        return getSelfCombat() * this.manaCost() / adjustedTicks * Math.sqrt(1 + towns[0].totalFight / 100);
     },
     loopsFinished() {
         // empty
@@ -1258,10 +1257,10 @@ Action.SmallDungeon = new DungeonAction("Small Dungeon", 0, {
     loopCost(segment) {
         return precision3(Math.pow(2, Math.floor((towns[this.townNum].SDungeonLoopCounter + segment) / this.segments + 0.0000001)) * 15000);
     },
-    tickProgress(offset) {
+    tickProgress(_, adjustedTicks) {
         const floor = Math.floor((towns[this.townNum].SDungeonLoopCounter) / this.segments + 0.0000001);
         return (getSelfCombat() + getSkillLevel("Magic")) *
-            (1 + getLevel(this.loopStats[(towns[this.townNum].SDungeonLoopCounter + offset) % this.loopStats.length]) / 100) *
+            this.manaCost() / adjustedTicks *
             Math.sqrt(1 + dungeons[this.dungeonNum][floor].completed / 200);
     },
     loopsFinished() {
@@ -2274,8 +2273,8 @@ Action.DarkRitual = new MultipartAction("Dark Ritual", {
     loopCost(segment) {
         return 1000000 * (segment * 2 + 1);
     },
-    tickProgress(offset) {
-        return getSkillLevel("Dark") * (1 + getLevel(this.loopStats[(towns[1].DarkRitualLoopCounter + offset) % this.loopStats.length]) / 100) / (1 - towns[1].getLevel("Witch") * 0.005);
+    tickProgress(_, adjustedTicks) {
+        return getSkillLevel("Dark") * this.manaCost() / adjustedTicks / (1 - towns[1].getLevel("Witch") * 0.005);
     },
     loopsFinished() {
         sacrificeSoulstones(this.goldCost());
@@ -2637,11 +2636,11 @@ Action.AdventureGuild = new MultipartAction("Adventure Guild", {
     loopCost(segment) {
         return precision3(Math.pow(1.2, towns[2][`${this.varName}LoopCounter`] + segment)) * 5e6;
     },
-    tickProgress(offset) {
+    tickProgress(offset, adjustedTicks) {
         return (getSkillLevel("Magic") / 2 +
-                getSelfCombat("Combat")) *
-                (1 + getLevel(this.loopStats[(towns[2][`${this.varName}LoopCounter`] + offset) % this.loopStats.length]) / 100) *
-                Math.sqrt(1 + towns[2][`total${this.varName}`] / 1000);
+            getSelfCombat("Combat")) *
+            this.manaCost() / adjustedTicks *
+            Math.sqrt(1 + towns[2][`total${this.varName}`] / 1000);
     },
     loopsFinished() {
         if (curAdvGuildSegment >= 0) unlockStory("advGuildRankEReached");
@@ -2784,10 +2783,10 @@ Action.LargeDungeon = new DungeonAction("Large Dungeon", 1, {
     loopCost(segment) {
         return precision3(Math.pow(3, Math.floor((towns[this.townNum].LDungeonLoopCounter + segment) / this.segments + 0.0000001)) * 5e5);
     },
-    tickProgress(offset) {
+    tickProgress(_, adjustedTicks) {
         const floor = Math.floor((towns[this.townNum].LDungeonLoopCounter) / this.segments + 0.0000001);
         return (getTeamCombat() + getSkillLevel("Magic")) *
-            (1 + getLevel(this.loopStats[(towns[this.townNum].LDungeonLoopCounter + offset) % this.loopStats.length]) / 100) *
+            this.manaCost() / adjustedTicks *
             Math.sqrt(1 + dungeons[this.dungeonNum][floor].completed / 200);
     },
     loopsFinished() {
@@ -2856,11 +2855,11 @@ Action.CraftingGuild = new MultipartAction("Crafting Guild", {
     loopCost(segment) {
         return precision3(Math.pow(1.2, towns[2][`${this.varName}LoopCounter`] + segment)) * 2e6;
     },
-    tickProgress(offset) {
+    tickProgress(_, adjustedTicks) {
         return (getSkillLevel("Magic") / 2 +
-                getSkillLevel("Crafting")) *
-                (1 + getLevel(this.loopStats[(towns[2][`${this.varName}LoopCounter`] + offset) % this.loopStats.length]) / 100) *
-                Math.sqrt(1 + towns[2][`total${this.varName}`] / 1000);
+            getSkillLevel("Crafting")) *
+            this.manaCost() / adjustedTicks *
+            Math.sqrt(1 + towns[2][`total${this.varName}`] / 1000);
     },
     loopsFinished() {
         if (curCraftGuildSegment >= 0) unlockStory("craftGuildRankEReached");
@@ -3696,8 +3695,8 @@ Action.HuntTrolls = new MultipartAction("Hunt Trolls", {
     loopCost(segment) {
         return precision3(Math.pow(2, Math.floor((towns[this.townNum].HuntTrollsLoopCounter + segment) / this.segments + 0.0000001)) * 1e6);
     },
-    tickProgress(offset) {
-        return (getSelfCombat() * (1 + getLevel(this.loopStats[(towns[3].HuntTrollsLoopCounter + offset) % this.loopStats.length]) / 100) * Math.sqrt(1 + towns[3].totalHuntTrolls / 100));
+    tickProgress(_, adjustedTicks) {
+        return (getSelfCombat() * this.manaCost() / adjustedTicks * Math.sqrt(1 + towns[3].totalHuntTrolls / 100));
     },
     loopsFinished() {
         handleSkillExp(this.skills);
@@ -3837,8 +3836,8 @@ Action.ImbueMind = new MultipartAction("Imbue Mind", {
     loopCost(segment) {
         return 100000000 * (segment * 5 + 1);
     },
-    tickProgress(offset) {
-        return getSkillLevel("Magic") * (1 + getLevel(this.loopStats[(towns[3].ImbueMindLoopCounter + offset) % this.loopStats.length]) / 100);
+    tickProgress(_, adjustedTicks) {
+        return getSkillLevel("Magic") * this.manaCost() / adjustedTicks;
     },
     loopsFinished() {
         sacrificeSoulstones(this.goldCost());
@@ -3892,8 +3891,8 @@ Action.ImbueBody = new MultipartAction("Imbue Body", {
     loopCost(segment) {
         return 100000000 * (segment * 5 + 1);
     },
-    tickProgress(offset) {
-        return getSkillLevel("Magic") * (1 + getLevel(this.loopStats[(towns[3].ImbueBodyLoopCounter + offset) % this.loopStats.length]) / 100);
+    tickProgress(_, adjustedTicks) {
+        return getSkillLevel("Magic") * this.manaCost() / adjustedTicks;
     },
     loopsFinished() {
         for (const stat in stats) {
@@ -4168,8 +4167,8 @@ Action.TidyUp = new MultipartAction("Tidy Up", {
     loopCost(segment) {
         return fibonacci(Math.floor((towns[4].TidyLoopCounter + segment) - towns[4].TidyLoopCounter / 3 + 0.0000001)) * 1000000; // Temp.
     },
-    tickProgress(offset) {
-        return getSkillLevel("Practical") * (1 + getLevel(this.loopStats[(towns[4].TidyLoopCounter + offset) % this.loopStats.length]) / 100) * Math.sqrt(1 + towns[4].totalTidy / 100);
+    tickProgress(_, adjustedTicks) {
+        return getSkillLevel("Practical") * this.manaCost() / adjustedTicks * Math.sqrt(1 + towns[4].totalTidy / 100);
     },
     loopsFinished() {
         addResource("reputation", 1);
@@ -4427,11 +4426,11 @@ Action.WizardCollege = new MultipartAction("Wizard College", {
     loopCost(segment) {
         return precision3(Math.pow(1.3, towns[4][`${this.varName}LoopCounter`] + segment)) * 1e7; // Temp
     },
-    tickProgress(offset) {
+    tickProgress(_, adjustedTicks) {
         return (
             getSkillLevel("Magic") + getSkillLevel("Practical") + getSkillLevel("Dark") +
             getSkillLevel("Chronomancy") + getSkillLevel("Pyromancy") + getSkillLevel("Restoration") + getSkillLevel("Spatiomancy")) *
-            (1 + getLevel(this.loopStats[(towns[4][`${this.varName}LoopCounter`] + offset) % this.loopStats.length]) / 100) *
+            this.manaCost() / adjustedTicks *
             Math.sqrt(1 + towns[4][`total${this.varName}`] / 1000);
     },
     loopsFinished() {
@@ -4553,7 +4552,7 @@ Action.Spatiomancy = new Action("Spatiomancy", {
         adjustAll();
         for (const action of totalActionList) {
             if (towns[action.townNum].varNames.indexOf(action.varName) !== -1) {
-                view.requestUpdate("updateRegular", {name: action.varName, index: action.townNum});
+                view.requestUpdate("updateRegular", { name: action.varName, index: action.townNum});
             }
         }
     },
@@ -4706,8 +4705,8 @@ Action.GreatFeast = new MultipartAction("Great Feast", {
     loopCost(segment) {
         return 1000000000 * (segment * 5 + 1);
     },
-    tickProgress(offset) {
-        return getSkillLevel("Practical") * (1 + getLevel(this.loopStats[(towns[4].GreatFeastLoopCounter + offset) % this.loopStats.length]) / 100);
+    tickProgress(_, adjustedTicks) {
+        return getSkillLevel("Practical") * this.manaCost() / adjustedTicks;
     },
     loopsFinished() {
         sacrificeSoulstones(this.goldCost());
@@ -4759,9 +4758,9 @@ Action.FightFrostGiants = new MultipartAction("Fight Frost Giants", {
     loopCost(segment) {
         return precision3(Math.pow(1.3, towns[4][`${this.varName}LoopCounter`] + segment)) * 1e7; // Temp
     },
-    tickProgress(offset) {
+    tickProgress(_, adjustedTicks) {
         return (getSelfCombat() *
-            (1 + getLevel(this.loopStats[(towns[4][`${this.varName}LoopCounter`] + offset) % this.loopStats.length]) / 100) *
+            this.manaCost() / adjustedTicks *
             Math.sqrt(1 + towns[4][`total${this.varName}`] / 1000));
     },
     loopsFinished() {
@@ -5085,10 +5084,10 @@ Action.TheSpire = new DungeonAction("The Spire", 2, {
     loopCost(segment) {
         return precision3(Math.pow(2, Math.floor((towns[this.townNum].TheSpireLoopCounter + segment) / this.segments + 0.0000001)) * 1e7);
     },
-    tickProgress(offset) {
+    tickProgress(_, adjustedTicks) {
         const floor = Math.floor((towns[this.townNum].TheSpireLoopCounter) / this.segments + 0.0000001);
         return getTeamCombat() * (1 + 0.1 * resources.pylons) *
-        (1 + getLevel(this.loopStats[(towns[this.townNum].TheSpireLoopCounter + offset) % this.loopStats.length]) / 100) *
+        this.manaCost() / adjustedTicks  *
         Math.sqrt(1 + dungeons[this.dungeonNum][floor].completed / 200);
     },
     loopsFinished() {
@@ -5266,9 +5265,9 @@ Action.FightJungleMonsters = new MultipartAction("Fight Jungle Monsters", {
     loopCost(segment) {
         return precision3(Math.pow(1.3, towns[6][`${this.varName}LoopCounter`] + segment)) * 1e8; // Temp
     },
-    tickProgress(offset) {
+    tickProgress(_, adjustedTicks) {
         return (getSelfCombat() *
-            (1 + getLevel(this.loopStats[(towns[6][`${this.varName}LoopCounter`] + offset) % this.loopStats.length]) / 100) *
+            this.manaCost() / adjustedTicks *
             Math.sqrt(1 + towns[6][`total${this.varName}`] / 1000));
     },
     loopsFinished() {
@@ -5357,8 +5356,8 @@ Action.RescueSurvivors = new MultipartAction("Rescue Survivors", {
     loopCost(segment) {
         return fibonacci(2 + Math.floor((towns[6].RescueLoopCounter + segment) / this.segments + 0.0000001)) * 5000;
     },
-    tickProgress(offset) {
-        return getSkillLevel("Magic") * Math.max(getSkillLevel("Restoration") / 100, 1) * (1 + getLevel(this.loopStats[(towns[6].RescueLoopCounter + offset) % this.loopStats.length]) / 100) * Math.sqrt(1 + towns[6].totalRescue / 100);
+    tickProgress(_, adjustedTicks) {
+        return getSkillLevel("Magic") * Math.max(getSkillLevel("Restoration") / 100, 1) * this.manaCost() / adjustedTicks * Math.sqrt(1 + towns[6].totalRescue / 100);
     },
     loopsFinished() {
         addResource("reputation", 4);
@@ -5656,11 +5655,11 @@ Action.ThievesGuild = new MultipartAction("Thieves Guild", {
     loopCost(segment) {
         return precision3(Math.pow(1.2, towns[7][`${this.varName}LoopCounter`] + segment)) * 5e8;
     },
-    tickProgress(offset) {
+    tickProgress(_, adjustedTicks) {
         return (getSkillLevel("Practical") +
-                getSkillLevel("Thievery")) *
-                (1 + getLevel(this.loopStats[(towns[7][`${this.varName}LoopCounter`] + offset) % this.loopStats.length]) / 100) *
-                Math.sqrt(1 + towns[7][`total${this.varName}`] / 1000);
+            getSkillLevel("Thievery")) *
+            this.manaCost() / adjustedTicks *
+            Math.sqrt(1 + towns[7][`total${this.varName}`] / 1000);
     },
     loopsFinished() {
     },
@@ -6114,8 +6113,8 @@ Action.ImbueSoul = new MultipartAction("Imbue Soul", {
     loopCost(segment) {
         return 100000000 * (segment * 5 + 1);
     },
-    tickProgress(offset) {
-        return getSkillLevel("Magic") * (1 + getLevel(this.loopStats[(towns[8].ImbueSoulLoopCounter + offset) % this.loopStats.length]) / 100);
+    tickProgress(_, adjustedTicks) {
+        return getSkillLevel("Magic") * this.manaCost() / adjustedTicks;
     },
     loopsFinished() {
         for (const stat in stats) {

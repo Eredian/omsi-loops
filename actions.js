@@ -30,7 +30,7 @@ function Actions() {
                 segment++;
             }
             // segment is 0,1,2
-            const toAdd = curAction.tickProgress(segment) * (curAction.manaCost() / curAction.adjustedTicks);
+            const toAdd = curAction.tickProgress(segment, curAction.adjustedTicks) * (curAction.manaCost() / curAction.adjustedTicks);
             // console.log("using: "+curAction.loopStats[(towns[curAction.townNum][curAction.varName + "LoopCounter"]+segment) % curAction.loopStats.length]+" to add: " + toAdd + " to segment: " + segment + " and part " +towns[curAction.townNum][curAction.varName + "LoopCounter"]+" of progress " + curProgress + " which costs: " + curAction.loopCost(segment));
             towns[curAction.townNum][curAction.varName] += toAdd;
             curProgress += toAdd;
